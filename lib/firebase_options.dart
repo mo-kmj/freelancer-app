@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'freelancer-a003b.firebasestorage.app',
     measurementId: 'G-EQKMWYS6GJ',
   );
+
 }
