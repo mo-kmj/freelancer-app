@@ -5,7 +5,7 @@ enum ProjectStatus { todo, inProgress, overdue, completed }
 enum Priority { low, medium, high }
 enum TaskStatus { todo, progress, done }
 
-// Data Models
+// ------------------ ProjectData ------------------
 class ProjectData {
   final String id;
   final String title;
@@ -39,7 +39,7 @@ class ProjectData {
     required this.tasks,
   });
 
-  // Factory constructor for Firestore
+  // From Firestore
   factory ProjectData.fromFirestore(String id, Map<String, dynamic> data) {
     return ProjectData(
       id: id,
@@ -62,42 +62,38 @@ class ProjectData {
       timeSpent: data['timeSpent'] ?? '',
       notes: data['notes'] ?? '',
       tasks: (data['tasks'] as List<dynamic>? ?? [])
-          .map((task) => TaskData(
-                id: task['id'] ?? '',
-                name: task['name'] ?? '',
-                status: TaskStatus.values.firstWhere(
-                  (e) => e.toString().split('.').last == (task['status'] ?? 'todo'),
-                  orElse: () => TaskStatus.todo,
-                ),
-                description: task['description'],
-                assignee: task['assignee'],
-                dueDate: task['dueDate'] != null ? DateTime.tryParse(task['dueDate']) : null,
-                completedDate: task['completedDate'] != null ? DateTime.tryParse(task['completedDate']) : null,
-              ))
+          .map((task) => TaskData.fromFirestore(task as Map<String, dynamic>))
           .toList(),
     );
   }
 
-  // Helper method to get progress percentage as a double
+  // To Firestore
+  Map<String, dynamic> toJsonFirestore() {
+    return {
+      'title': title,
+      'client': client,
+      'clientId': clientId,
+      'status': status.toString().split('.').last,
+      'priority': priority.toString().split('.').last,
+      'progress': progress,
+      'dueDate': dueDate,
+      'completedDate': completedDate,
+      'description': description,
+      'budget': budget,
+      'timeSpent': timeSpent,
+      'notes': notes,
+      'tasks': tasks.map((task) => task.toJsonFirestore()).toList(),
+    };
+  }
+
+  // ------------------ Helpers ------------------
   double get progressPercentage => progress / 100.0;
-
-  // Helper method to check if project is overdue
   bool get isOverdue => status == ProjectStatus.overdue;
-
-  // Helper method to check if project is completed
   bool get isCompleted => status == ProjectStatus.completed;
-
-  // Helper method to get completed tasks count
   int get completedTasksCount => tasks.where((task) => task.status == TaskStatus.done).length;
-
-  // Helper method to get total tasks count
   int get totalTasksCount => tasks.length;
+  double get taskCompletionPercentage => totalTasksCount > 0 ? completedTasksCount / totalTasksCount : 0.0;
 
-  // Helper method to get task completion percentage
-  double get taskCompletionPercentage => 
-      totalTasksCount > 0 ? completedTasksCount / totalTasksCount : 0.0;
-
-  // Copy with method for immutability
   ProjectData copyWith({
     String? id,
     String? title,
@@ -133,6 +129,7 @@ class ProjectData {
   }
 }
 
+// ------------------ TaskData ------------------
 class TaskData {
   final String id;
   final String name;
@@ -152,19 +149,40 @@ class TaskData {
     this.completedDate,
   });
 
-  // Helper method to check if task is completed
-  bool get isCompleted => status == TaskStatus.done;
-
-  // Helper method to check if task is in progress
-  bool get isInProgress => status == TaskStatus.progress;
-
-  // Helper method to check if task is overdue
-  bool get isOverdue {
-    if (dueDate == null || isCompleted) return false;
-    return DateTime.now().isAfter(dueDate!);
+  // From Firestore
+  factory TaskData.fromFirestore(Map<String, dynamic> data) {
+    return TaskData(
+      id: data['id'] ?? '',
+      name: data['name'] ?? '',
+      status: TaskStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == (data['status'] ?? 'todo'),
+        orElse: () => TaskStatus.todo,
+      ),
+      description: data['description'],
+      assignee: data['assignee'],
+      dueDate: data['dueDate'] != null ? DateTime.tryParse(data['dueDate']) : null,
+      completedDate: data['completedDate'] != null ? DateTime.tryParse(data['completedDate']) : null,
+    );
   }
 
-  // Copy with method for immutability
+  // To Firestore
+  Map<String, dynamic> toJsonFirestore() {
+    return {
+      'id': id,
+      'name': name,
+      'status': status.toString().split('.').last,
+      'description': description,
+      'assignee': assignee,
+      'dueDate': dueDate?.toIso8601String(),
+      'completedDate': completedDate?.toIso8601String(),
+    };
+  }
+
+  // ------------------ Helpers ------------------
+  bool get isCompleted => status == TaskStatus.done;
+  bool get isInProgress => status == TaskStatus.progress;
+  bool get isOverdue => dueDate != null && !isCompleted && DateTime.now().isAfter(dueDate!);
+
   TaskData copyWith({
     String? id,
     String? name,
@@ -186,6 +204,7 @@ class TaskData {
   }
 }
 
+// ------------------ ClientData ------------------
 class ClientData {
   final String id;
   final String name;
@@ -225,7 +244,7 @@ class ClientData {
     this.notes,
   });
 
-  // Factory constructor for Firestore
+  // From Firestore
   factory ClientData.fromFirestore(String id, Map<String, dynamic> data) {
     return ClientData(
       id: id,
@@ -248,29 +267,37 @@ class ClientData {
     );
   }
 
-  // Helper method to get total projects count
+  // To Firestore
+  Map<String, dynamic> toJsonFirestore() {
+    return {
+      'name': name,
+      'contact': contact,
+      'email': email,
+      'phone': phone,
+      'industry': industry,
+      'avatar': avatar,
+      'totalRevenue': totalRevenue,
+      'projects': projects,
+      'activeProjects': activeProjects,
+      'description': description,
+      'joinDate': joinDate,
+      'lastContact': lastContact,
+      'address': address,
+      'website': website,
+      'notes': notes,
+    };
+  }
+
+  // ------------------ Helpers ------------------
   int get totalProjectsCount => projects.length;
-
-  // Helper method to get completed projects count (would need project data to calculate)
-  // int getCompletedProjectsCount(Map<String, ProjectData> projectData) {
-  //   return projects.where((projectId) {
-  //     final project = projectData[projectId];
-  //     return project?.status == ProjectStatus.completed;
-  //   }).length;
-  // }
-
-  // Helper method to check if client has active projects
   bool get hasActiveProjects => activeProjects > 0;
-
-  // Helper method to get initials for avatar
   String get initials {
     final words = name.trim().split(RegExp(r'\s+'));
     if (words.isEmpty) return '';
-    if (words.length == 1) return words[0].substring(0, 1).toUpperCase();
-    return (words[0].substring(0, 1) + words[1].substring(0, 1)).toUpperCase();
+    if (words.length == 1) return words[0][0].toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
   }
 
-  // Copy with method for immutability
   ClientData copyWith({
     String? id,
     String? name,
@@ -312,6 +339,7 @@ class ClientData {
   }
 }
 
+// ------------------ UserModel ------------------
 class UserModel {
   final String id;
   final String name;
@@ -335,15 +363,43 @@ class UserModel {
     this.isActive = true,
   });
 
-  // Helper method to get user initials
+  // From Firestore
+  factory UserModel.fromFirestore(String id, Map<String, dynamic> data) {
+    return UserModel(
+      id: id,
+      name: data['name'] ?? '',
+      email: data['email'] ?? '',
+      role: data['role'] ?? '',
+      avatar: data['avatar'],
+      phone: data['phone'],
+      createdAt: data['createdAt'] != null ? DateTime.tryParse(data['createdAt']) : null,
+      lastLoginAt: data['lastLoginAt'] != null ? DateTime.tryParse(data['lastLoginAt']) : null,
+      isActive: data['isActive'] ?? true,
+    );
+  }
+
+  // To Firestore
+  Map<String, dynamic> toJsonFirestore() {
+    return {
+      'name': name,
+      'email': email,
+      'role': role,
+      'avatar': avatar,
+      'phone': phone,
+      'createdAt': createdAt?.toIso8601String(),
+      'lastLoginAt': lastLoginAt?.toIso8601String(),
+      'isActive': isActive,
+    };
+  }
+
+  // ------------------ Helpers ------------------
   String get initials {
     final words = name.trim().split(RegExp(r'\s+'));
     if (words.isEmpty) return '';
-    if (words.length == 1) return words[0].substring(0, 1).toUpperCase();
-    return (words[0].substring(0, 1) + words[1].substring(0, 1)).toUpperCase();
+    if (words.length == 1) return words[0][0].toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
   }
 
-  // Copy with method for immutability
   UserModel copyWith({
     String? id,
     String? name,
@@ -369,187 +425,32 @@ class UserModel {
   }
 }
 
-// Color constants used throughout the app
-const Color textWhite = Colors.white;
-const Color accentCyan = Color(0xFF33CFFF);
-const Color accentPink = Color(0xFFFF1EC0);
-const Color bgPrimary = Color(0xFF1E1A3C);
-const Color bgSecondary = Color(0xFF1B1737);
-
-// Additional color constants for better theming
-const Color textGrey = Color(0xFF9CA3AF);
-const Color textLight = Color(0xFFE5E7EB);
-const Color borderColor = Color(0xFF374151);
-const Color successGreen = Color(0xFF10B981);
-const Color warningYellow = Color(0xFFF59E0B);
-const Color dangerRed = Color(0xFFEF4444);
-
-// Helper functions for ProjectStatus
-String getStatusText(ProjectStatus status) {
-  switch (status) {
-    case ProjectStatus.todo:
-      return 'To Do';
-    case ProjectStatus.inProgress:
-      return 'In Progress';
-    case ProjectStatus.overdue:
-      return 'Overdue';
-    case ProjectStatus.completed:
-      return 'Completed';
-  }
-}
-
-String getStatusTitle(ProjectStatus status) {
-  switch (status) {
-    case ProjectStatus.todo:
-      return 'To Do Projects';
-    case ProjectStatus.inProgress:
-      return 'In Progress Projects';
-    case ProjectStatus.overdue:
-      return 'Overdue Projects';
-    case ProjectStatus.completed:
-      return 'Completed Projects';
-  }
-}
-
-Color getStatusColor(ProjectStatus status) {
-  switch (status) {
-    case ProjectStatus.todo:
-      return Colors.blue;
-    case ProjectStatus.inProgress:
-      return warningYellow;
-    case ProjectStatus.overdue:
-      return dangerRed;
-    case ProjectStatus.completed:
-      return successGreen;
-  }
-}
-
-Color getStatusHeaderColor(ProjectStatus status) {
-  return getStatusColor(status); // Simplified to use same color
-}
-
-IconData getStatusIcon(ProjectStatus status) {
-  switch (status) {
-    case ProjectStatus.todo:
-      return Icons.access_time;
-    case ProjectStatus.inProgress:
-      return Icons.refresh;
-    case ProjectStatus.overdue:
-      return Icons.warning;
-    case ProjectStatus.completed:
-      return Icons.check_circle;
-  }
-}
-
-// Helper functions for Priority
-String getPriorityText(Priority priority) {
-  switch (priority) {
-    case Priority.low:
-      return 'Low';
-    case Priority.medium:
-      return 'Medium';
-    case Priority.high:
-      return 'High';
-  }
-}
-
-Color getPriorityColor(Priority priority) {
-  switch (priority) {
-    case Priority.low:
-      return successGreen;
-    case Priority.medium:
-      return warningYellow;
-    case Priority.high:
-      return dangerRed;
-  }
-}
-
-IconData getPriorityIcon(Priority priority) {
-  switch (priority) {
-    case Priority.low:
-      return Icons.keyboard_arrow_down;
-    case Priority.medium:
-      return Icons.remove;
-    case Priority.high:
-      return Icons.keyboard_arrow_up;
-  }
-}
-
-// Helper functions for TaskStatus
-String getTaskStatusText(TaskStatus status) {
-  switch (status) {
-    case TaskStatus.todo:
-      return 'To Do';
-    case TaskStatus.progress:
-      return 'In Progress';
-    case TaskStatus.done:
-      return 'Done';
-  }
-}
-
-Color getTaskStatusColor(TaskStatus status) {
-  switch (status) {
-    case TaskStatus.todo:
-      return textGrey;
-    case TaskStatus.progress:
-      return warningYellow;
-    case TaskStatus.done:
-      return successGreen;
-  }
-}
-
-IconData getTaskStatusIcon(TaskStatus status) {
-  switch (status) {
-    case TaskStatus.todo:
-      return Icons.radio_button_unchecked;
-    case TaskStatus.progress:
-      return Icons.refresh;
-    case TaskStatus.done:
-      return Icons.check_circle;
-  }
-}
-
-// Utility functions
+// ------------------ Utilities ------------------
 class AppUtils {
-  // Format currency
   static String formatCurrency(double amount, {String symbol = '\$'}) {
-    if (amount >= 1000000) {
-      return '$symbol${(amount / 1000000).toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      return '$symbol${(amount / 1000).toStringAsFixed(1)}K';
-    } else {
-      return '$symbol${amount.toStringAsFixed(0)}';
-    }
+    if (amount >= 1000000) return '$symbol${(amount / 1000000).toStringAsFixed(1)}M';
+    if (amount >= 1000) return '$symbol${(amount / 1000).toStringAsFixed(1)}K';
+    return '$symbol${amount.toStringAsFixed(0)}';
   }
 
-  // Format date
   static String formatDate(DateTime date) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  // Get time ago string
   static String getTimeAgo(DateTime date) {
     final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 365) {
-      return '${(difference.inDays / 365).floor()} year${difference.inDays > 730 ? 's' : ''} ago';
-    } else if (difference.inDays > 30) {
-      return '${(difference.inDays / 30).floor()} month${difference.inDays > 60 ? 's' : ''} ago';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-    } else {
-      return 'Just now';
-    }
+    final diff = now.difference(date);
+    if (diff.inDays > 365) return '${(diff.inDays / 365).floor()} year${diff.inDays > 730 ? 's' : ''} ago';
+    if (diff.inDays > 30) return '${(diff.inDays / 30).floor()} month${diff.inDays > 60 ? 's' : ''} ago';
+    if (diff.inDays > 0) return '${diff.inDays} day${diff.inDays > 1 ? 's' : ''} ago';
+    if (diff.inHours > 0) return '${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes} minute${diff.inMinutes > 1 ? 's' : ''} ago';
+    return 'Just now';
   }
+
 
   // Validate email
   static bool isValidEmail(String email) {
